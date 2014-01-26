@@ -1,47 +1,44 @@
 # -*- coding: utf-8 -*-
-"""
-IPython 1.0 extension for physical quantity input.
-See README.txt for usage examples.
+""" IPython extension for physical quantity input """
 
-Author: Georg Brandl <georg@python.org>.
-This file has been placed in the public domain.
-"""
+#-----------------------------------------------------------------------------
+#  Copyright (C) 2013  The IPython Development Team
+#
+#  Distributed under the terms of the BSD License.  The full license is in
+#  the file COPYING, distributed as part of this software.
+#-----------------------------------------------------------------------------
+# Original author: Georg Brandl <georg@python.org>.
+#                  https://bitbucket.org/birkenfeld/ipython-physics
 
 import re
 import sys
 from math import pi
-
 import numpy as np
-from IPython.core.inputtransformer import StatelessInputTransformer, CoroutineInputTransformer
+
+from IPython.core.inputtransformer import StatelessInputTransformer
+from IPython.core.inputtransformer import CoroutineInputTransformer
 from IPython.display import display, Math, Latex
-    
+
 # allow uncertain values if the "uncertainties" package is available
 try:
     from uncertainties import ufloat, Variable, AffineScalarFunc
     import uncertainties.umath as unp
     uncertain = (Variable, AffineScalarFunc)
+
     def valuetype(v, u):
         if isinstance(v, uncertain):
-            return v #.value.nominal_value
-#        return ufloat(v,u)
+            return v
         elif u is None:
-           return float(v)
+            return float(v)
         return ufloat(float(v), float(u))
 except ImportError:
     uncertain = ()
-#    valuetype = lambda (v, u): v
-    def valuetype(v, u):
-       if u is None:
-           return float(v)
-       return v
-    unp = np
 
-    
-#uncertain = ()    
-#valuetype = lambda (v, u): v  
-#def valuetype(v, u):
-#    return float(v)
-#unp = np
+    def valuetype(v, u):
+        if u is None:
+            return float(v)
+        return v
+    unp = np
 
 
 class UnitError(ValueError):
@@ -51,6 +48,7 @@ class UnitError(ValueError):
 # Written by Konrad Hinsen <hinsen@cnrs-orleans.fr>
 # with contributions from Greg Ward
 # last revision: 2007-5-25
+
 
 class NumberDict(dict):
     """Dictionary storing numerical values.
@@ -68,7 +66,7 @@ class NumberDict(dict):
             return 0
 
     def __coerce__(self, other):
-        if type(other) == type({}):
+        if isinstance(other, dict):
             other = NumberDict(other)
         return self, other
 
@@ -103,8 +101,11 @@ class NumberDict(dict):
 
 
 # Type checks
+
+
 def isPhysicalUnit(x):
     return hasattr(x, 'factor') and hasattr(x, 'powers')
+
 
 def isPhysicalQuantity(x):
     return hasattr(x, 'value') and hasattr(x, 'unit')
@@ -169,14 +170,14 @@ class PhysicalUnit(object):
     @property
     def is_angle(self):
         return self.powers[7] == 1 and \
-               reduce(lambda a, b: a + b, self.powers) == 1
+            reduce(lambda a, b: a + b, self.powers) == 1
 
     def __str__(self):
         return self.name
 
     def __repr__(self):
         return '<PhysicalUnit ' + self.name + '>'
-            
+
     def __cmp__(self, other):
         if self.powers != other.powers:
             raise UnitError('Incompatible units')
@@ -188,7 +189,7 @@ class PhysicalUnit(object):
         if isPhysicalUnit(other):
             return PhysicalUnit(self.names + other.names,
                                 self.factor * other.factor,
-                                map(lambda a,b: a+b, self.powers, other.powers))
+                                map(lambda a, b: a+b, self.powers, other.powers))
         else:
             return PhysicalUnit(self.names + {str(other): 1},
                                 self.factor * other, self.powers,
@@ -213,7 +214,7 @@ class PhysicalUnit(object):
         if isPhysicalUnit(other):
             return PhysicalUnit(other.names - self.names,
                                 other.factor/self.factor,
-                                map(lambda a,b: a-b, other.powers, self.powers))
+                                map(lambda a, b: a-b, other.powers, self.powers))
         else:
             return PhysicalUnit({str(other): 1} - self.names,
                                 other / self.factor,
@@ -224,7 +225,7 @@ class PhysicalUnit(object):
             raise UnitError('Cannot exponentiate units with non-zero offset')
         if isinstance(other, int):
             return PhysicalUnit(other*self.names, pow(self.factor, other),
-                                map(lambda x,p=other: x*p, self.powers))
+                                map(lambda x, p=other: x*p, self.powers))
         if isinstance(other, float):
             inv_exp = 1./other
             rounded = int(np.floor(inv_exp + 0.5))
@@ -232,7 +233,7 @@ class PhysicalUnit(object):
                 if reduce(lambda a, b: a and b,
                           map(lambda x, e=rounded: x%e == 0, self.powers)):
                     f = pow(self.factor, other)
-                    p = map(lambda x,p=rounded: x/p, self.powers)
+                    p = map(lambda x, p=rounded: x/p, self.powers)
                     if reduce(lambda a, b: a and b,
                               map(lambda x, e=rounded: x%e == 0,
                                   self.names.values())):
@@ -254,8 +255,8 @@ class PhysicalUnit(object):
             raise UnitError('Incompatible units')
         if self.offset != other.offset and self.factor != other.factor:
             raise UnitError(('Unit conversion (%s to %s) cannot be expressed ' +
-                             'as a simple multiplicative factor') %
-                             (self.name, other.name))
+                            'as a simple multiplicative factor') %
+                            (self.name, other.name))
         return self.factor/other.factor
 
     def conversion_tuple_to(self, other):
@@ -286,15 +287,17 @@ class PhysicalUnit(object):
 # Helper functions
 
 def _findUnit(unit):
-    if isinstance(unit, basestring):      
+    if isinstance(unit, basestring):
         name = unit.strip().replace('^', '**').replace('µ', 'mu').replace('°', 'deg')
         try:
             unit = eval(name, _unit_table)
         except NameError:
             raise UnitError('Invalid or unknown unit in %s' % name)
         for cruft in ['__builtins__', '__args__']:
-            try: del _unit_table[cruft]
-            except: pass
+            try:
+                del _unit_table[cruft]
+            except:
+                pass
     if not isPhysicalUnit(unit):
         raise UnitError(str(unit) + ' is not a unit')
     return unit
@@ -319,7 +322,7 @@ class PhysicalQuantity(object):
     global_precision = 8
 
     _number = re.compile(r'([+-]?[0-9]+(?:\.[0-9]*)?(?:[eE][+-]?[0-9]+)?)'
-                         r'(?:\s+\+\/-\s+([+-]?[0-9]+(?:\.[0-9]*)?(?:[eE][+-]?[0-9]+)?))?')
+        r'(?:\s+\+\/-\s+([+-]?[0-9]+(?:\.[0-9]*)?(?:[eE][+-]?[0-9]+)?))?')
 
     def __init__(self, value, unit=None, stdev=None):
         """There are two constructor calling patterns:
@@ -332,14 +335,14 @@ class PhysicalQuantity(object):
            is provided for more convenient interactive use.
         """
         if unit is not None:
-            self.value = valuetype(value, stdev )
+            self.value = valuetype(value, stdev)
             self.unit = _findUnit(unit)
         else:
             s = value.strip()
             match = self._number.match(s)
             if match is None:
                 raise UnitError('No number found in %r' % value)
-            self.value = valuetype(match.group(1), match.group(2) )
+            self.value = valuetype(match.group(1), match.group(2))
             self.unit = _findUnit(s[match.end(0):])
 
     def __str__(self):
@@ -348,10 +351,10 @@ class PhysicalQuantity(object):
         if isinstance(self.value, uncertain):
             stdev = self.value.std_dev
             if stdev:
-                return '%.*g +/- %.*g %s' % (prec, self.value.nominal_value,
+                return '%.*f +/- %.*f %s' % (prec, self.value.nominal_value,
                                              prec, stdev, unit)
-            return '%.*g %s' % (prec, self.value.nominal_value, unit)
-        return '%.*g %s' % (prec, self.value, unit)
+            return '%.*f %s' % (prec, self.value.nominal_value, unit)
+        return '%.*f %s' % (prec, self.value, unit)
 
     def __float__(self):
         if isinstance(self.value, uncertain):
@@ -362,28 +365,28 @@ class PhysicalQuantity(object):
     @property
     def Q(self):
         return self.__float__()
-            
+
     def __repr__(self):
         return self.__str__()
-        
+
     def _repr_latex_(self):
         prec = self.global_precision
         unit = self.unit.name.replace('**', '^')
         if isinstance(self.value, uncertain):
             stdev = self.value.std_dev
             if stdev:
-                s = r'%.*g $\pm$ %.*g $%s$' % (prec, self.value.nominal_value,
+                s = r'%.*f $\pm$ %.*f $%s$' % (prec, self.value.nominal_value,
                                              prec, stdev, unit)
             else:
-                s = r'%.*g $%s$' % (prec, self.value.nominal_value, unit)
+                s = r'%.*f $%s$' % (prec, self.value.nominal_value, unit)
         else:
-            s = r'%.*g $%s$' % (prec, self.value, unit)
+            s = r'%.*f $%s$' % (prec, self.value, unit)
         return s
 
     @property
     def latex(self):
         return Latex(self._repr_latex_())
-        
+
     def _sum(self, other, sign1, sign2):
         if not isPhysicalQuantity(other):
             raise UnitError('Incompatible types')
@@ -423,6 +426,8 @@ class PhysicalQuantity(object):
     def __div__(self, other):
         if isinstance(other, np.ndarray):
             return 1./other * self.__class__(self.value, self.unit) 
+        if isinstance(other, np.ndarray):
+            return other / self.__class__(self.value, self.unit)
         if not isPhysicalQuantity(other):
             return self.__class__(self.value / other, self.unit)
         value = self.value / other.value
@@ -433,10 +438,8 @@ class PhysicalQuantity(object):
             return self.__class__(value, unit)
 
     def __rdiv__(self, other):
-        if isinstance(other, np.ndarray):
-            return other # / self.__class__(self.value, self.unit)   
         if not isPhysicalQuantity(other):
-            return self.__class__(other / self.value, pow(self.unit, -1))	  
+            return self.__class__(other / self.value, pow(self.unit, -1))
         value = other.value / self.value
         unit = other.unit / self.unit
         if unit.is_dimensionless:
@@ -468,8 +471,8 @@ class PhysicalQuantity(object):
         return self.value != 0
 
     def __format__(self, *args, **kw):
-        return "{1:{0}} {2}".format(args[0],self.value, self.unit)
-    
+        return "{1:{0}} {2}".format(args[0], self.value, self.unit)
+
     def convert(self, unit):
         """Change the unit and adjust the value such that the combination is
         equivalent to the original one. The new unit must be compatible with the
@@ -504,7 +507,7 @@ class PhysicalQuantity(object):
             result = []
             value = self.value
             unit = self.unit
-            for i in range(len(units)-1,-1,-1):
+            for i in range(len(units)-1, -1, -1):
                 value = value*unit.conversion_factor_to(units[i])
                 if i == 0:
                     rounded = value
@@ -568,37 +571,40 @@ class PhysicalQuantity(object):
                            self.unit.conversion_factor_to(_unit_table['rad']))
         else:
             raise UnitError('Argument of tan must be an angle')
-#Q = PhysicalQuantity
+
 
 _base_names = ['m', 'kg', 's', 'A', 'K', 'mol', 'cd', 'rad', 'sr']
 
 _base_units = [
-    ('m',   PhysicalUnit('m',   1.,    [1,0,0,0,0,0,0,0,0])),
-    ('g',   PhysicalUnit('g',   0.001, [0,1,0,0,0,0,0,0,0])),
-    ('s',   PhysicalUnit('s',   1.,    [0,0,1,0,0,0,0,0,0])),
-    ('A',   PhysicalUnit('A',   1.,    [0,0,0,1,0,0,0,0,0])),
-    ('K',   PhysicalUnit('K',   1.,    [0,0,0,0,1,0,0,0,0])),
-    ('mol', PhysicalUnit('mol', 1.,    [0,0,0,0,0,1,0,0,0])),
-    ('cd',  PhysicalUnit('cd',  1.,    [0,0,0,0,0,0,1,0,0])),
-    ('rad', PhysicalUnit('rad', 1.,    [0,0,0,0,0,0,0,1,0])),
-    ('sr',  PhysicalUnit('sr',  1.,    [0,0,0,0,0,0,0,0,1])),
-]
+    ('m',   PhysicalUnit('m',   1.,    [1, 0, 0, 0, 0, 0, 0, 0, 0])),
+    ('g',   PhysicalUnit('g',   0.001, [0, 1, 0, 0, 0, 0, 0, 0, 0])),
+    ('s',   PhysicalUnit('s',   1.,    [0, 0, 1, 0, 0, 0, 0, 0, 0])),
+    ('A',   PhysicalUnit('A',   1.,    [0, 0, 0, 1, 0, 0, 0, 0, 0])),
+    ('K',   PhysicalUnit('K',   1.,    [0, 0, 0, 0, 1, 0, 0, 0, 0])),
+    ('mol', PhysicalUnit('mol', 1.,    [0, 0, 0, 0, 0, 1, 0, 0, 0])),
+    ('cd',  PhysicalUnit('cd',  1.,    [0, 0, 0, 0, 0, 0, 1, 0, 0])),
+    ('rad', PhysicalUnit('rad', 1.,    [0, 0, 0, 0, 0, 0, 0, 1, 0])),
+    ('sr',  PhysicalUnit('sr',  1.,    [0, 0, 0, 0, 0, 0, 0, 0, 1])), ]
 
 _unit_table = {}
 
 for unit in _base_units:
     _unit_table[unit[0]] = unit[1]
 
+
 def _addUnit(name, unit, comment=''):
-    if _unit_table.has_key(name):
+    if name in _unit_table:
         raise KeyError('Unit ' + name + ' already defined')
-    if type(unit) == type(''):
+    if isinstance(unit, str):
         unit = eval(unit, _unit_table)
         for cruft in ['__builtins__', '__args__']:
-            try: del _unit_table[cruft]
-            except: pass
+            try:
+                del _unit_table[cruft]
+            except:
+                pass
     unit.set_name(name)
     _unit_table[name] = unit
+
 
 def _addPrefixed(unit):
     _prefixed_names = []
@@ -607,7 +613,7 @@ def _addPrefixed(unit):
         _addUnit(name, prefix[1]*_unit_table[unit])
         _prefixed_names.append(name)
 
-_unit_table['kg'] = PhysicalUnit('kg',   1., [0,1,0,0,0,0,0,0,0])
+_unit_table['kg'] = PhysicalUnit('kg',   1., [0, 1, 0, 0, 0, 0, 0, 0, 0])
 _addUnit('Hz', '1/s', 'Hertz')
 _addUnit('N', 'm*kg/s**2', 'Newton')
 _addUnit('Pa', 'N/m**2', 'Pascal')
@@ -633,11 +639,12 @@ _prefixes = [
     ('p',  1.e-12), ('f',  1.e-15), ('a',  1.e-18), ('z',  1.e-21),
     ('y',  1.e-24),
 ]
+
 for unit in _unit_table.keys():
     _addPrefixed(unit)
 
 _unit_table['pi'] = np.pi
-_unit_table['kg'] = PhysicalUnit('kg',   1., [0,1,0,0,0,0,0,0,0])
+_unit_table['kg'] = PhysicalUnit('kg',   1., [0, 1, 0, 0, 0, 0, 0, 0, 0])
 
 # Angle units
 _addUnit('deg', 'pi*rad/180', 'degrees')
@@ -659,22 +666,22 @@ quantity_re = re.compile(quantity)
 subst_re = re.compile(r'\?' + name)
 
 # sort units after length for Regex matching
-_li=sorted(_unit_table.iterkeys(),key=len)
+_li = sorted(_unit_table.iterkeys(), key=len)
 _li.sort(key=len)
 _unit_list = '('
 for unit in _li[::-1]:
-    _unit_list+= unit + '|'
+    _unit_list += unit + '|'
 _unit_list = _unit_list[0:-1] + ')'
 
 # regex for finding units and quoted strings
 number = r'-?[\d0-9.]+'
 stringmatch = r'(["\'])(?:(?=(\\?))\2.)*?\1'
-match = stringmatch + '|' + number +  r'(\s*)' + _unit_list +  r'(?:\W+|$)' # r'(\W+)'
+match = stringmatch + '|' + number + r'(\s*)' + _unit_list + r'(?:\W+|$)'
 line_match = re.compile(match)
 
 # regex to match unit after it has been found using line_match
 number = r'(-?[\d0-9-]+)'
-match =  number +  r'(.\s|\s*)' + _unit_list 
+match = number + r'(.\s|\s*)' + _unit_list
 unit_match = re.compile(match)
 
 
@@ -683,6 +690,7 @@ def replace_inline(match):
     using a Quantity call.
     """
     return '(Quantity(\'' + match.group(1) + '\'))'
+
 
 def replace_slash(match):
     """Replace a double-slash unit conversion, e.g. ``c // km/s``, by valid
@@ -703,35 +711,40 @@ def replace_slash(match):
     else:
         return 'Quantity.any_to(%s, %r)' % (expr, unit)
 
+
 def replace_assign(match):
     """Replace a pretty assignment, e.g. ``B = 1 T``, by valid Python code using
     a Quantity call.
     """
     return '%s = Quantity(\'%s\')' % (match.group(1), match.group(2))
 
+
 def replace_inline(ml):
     """Replace an inline unit expression by valid Python code
     """
     if ml.group()[0][0] in '"\'':
         return ml.group()
+
     def replace_unit(mo):
         try:
             return mo.group(1) + "*" + '(Quantity(\'1 ' + mo.group(3) + '\'))'
         except KeyError:
             return mo.group()
-        
+
     return unit_match.sub(replace_unit, ml.group())
-    
+
+
 @StatelessInputTransformer.wrap
 def _transform(line):
     line = line_match.sub(replace_inline, line)
     return line
-        
+
 __transformer = _transform()
-     
+
+
 def load_ipython_extension(ip):
     global __transformer
-    ip.input_transformer_manager.logical_line_transforms.insert(0,__transformer)
+    ip.input_transformer_manager.logical_line_transforms.insert(0, __transformer)
 
     # set up simplified quantity input
     ip.user_ns['Quantity'] = PhysicalQuantity
@@ -743,11 +756,9 @@ def load_ipython_extension(ip):
     exec ip.compile('from __future__ import division', '<input>', 'single') \
         in ip.user_ns
 
-#    print("Unit calculation and physics extensions activated.")
-       
+
 def unload_ipython_extension(ip):
     global __transformer
     if type(__transformer) is StatelessInputTransformer:
         ip.input_transformer_manager.logical_line_transforms.remove(__transformer)
         ip.user_ns.pop('Quantity')
-#    print("Unit calculation and physics extensions deactivated.")
