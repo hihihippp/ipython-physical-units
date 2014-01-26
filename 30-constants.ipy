@@ -1,0 +1,7 @@
+
+# Standard constants 
+c0 = Quantity('299792458. m/s')
+mu0 = Quantity('4.e-7 pi*N/A**2').base
+kb = Quantity('1.3806488e-23 J/K')
+mps=Quantity('1 m')/Quantity('1 s')
+m2=Quantity('1 m')*Quantity('1 m')

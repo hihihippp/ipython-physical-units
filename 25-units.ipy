@@ -1,0 +1,48 @@
+# Load extensions to handle units and dB
+
+try:
+    Quantity
+except NameError:    
+    %load_ext physics_extension
+    %load_ext dB_extension
+
+    
+class UnitError(ValueError):
+    pass
+ 
+# Convert unit back to value
+def Q(arr):
+    if type(arr) == numpy.ndarray:
+        return arr.astype(float)
+    return arr.base.value
+
+# numpy linspace wrapper for units
+def Qlinspace(start, stop, num = 50,  endpoint=True, retstep=False):
+    if not isinstance(start,Quantity) and not isinstance(stop,Quantity):
+        return numpy.linspace(start, stop, num,  endpoint, retstep)
+
+    if isinstance(start,Quantity) and isinstance(stop,Quantity):
+        if start.base.unit != stop.base.unit:
+            print start.base.unit, stop.base.unit
+            raise UnitError("Cannot match units")
+    
+    if isinstance(start,Quantity):
+        start_value = start.value
+        unit = start.unit
+    else:
+        start_value = start
+
+    if isinstance(stop,Quantity):
+        stop_value = stop.value
+        unit = stop.unit
+    else:
+        stop_value = stop
+
+    array = numpy.linspace(start_value, stop_value, num,  endpoint, retstep)
+
+    if retstep:
+        return Quantity(array[0], unit), Quantity(array[1], unit)
+    else:
+        return array * Quantity(1, unit)
+
+setprec(2)
