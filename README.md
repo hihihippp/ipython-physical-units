@@ -5,11 +5,9 @@ IPython notebook extension to add physical units to the IPython notebook.
 This extension can also be used without the notebook.
 
 For an example notebook see here:
-[https://github.com/juhasch/ipython-physical-units/raw/master/notebooks/140126-units-example.ipynb]
+[http://nbviewer.ipython.org/github/juhasch/ipython-physical-units/blob/master/notebooks/140126-units-example.ipynb](140126-units-example.ipynb)
 
-
-This extension is based on code from Georg Brandl here:
-[https://bitbucket.org/birkenfeld/ipython-physics]
+This extension is based on code from Georg Brandl here: https://bitbucket.org/birkenfeld/ipython-physics
 
 Additional features
 -------------------
