@@ -9,14 +9,18 @@ http://nbviewer.ipython.org/github/juhasch/ipython-physical-units/blob/master/no
 
 This extension is based on code from Georg Brandl here: https://bitbucket.org/birkenfeld/ipython-physics
 
-Additional features
--------------------
+Features
+--------
 
-- _repr_ function to display units as TeX
-- ignores units inside strings / quotation marks
-- works with ndarrays
+- Provides standard units like m, s, g, A, K , mol, cd, rad, sr and derived units
+- All units can be prefixed with a scaling factor: nm, mm, cm, km
+- Optimized to work with the IPython notebook. Provides _repr_latex function to pretty print units
+- Basic support of Numpy ndarrays
+- Ignores units inside strings and quotation marks
 
-TODO:
+TODO
+----
+
 - I removed some of the units included in the original implementation, add them back.
 - Provide a more exhaustive list of physical constants
 - Improve interaction with the uncertainties module 
