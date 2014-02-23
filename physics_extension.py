@@ -130,6 +130,8 @@ class PhysicalUnit(object):
         @param offset: an additive offset to the base unit (used only for
                        temperatures)
         """
+
+        self.prefixed = False
         if isinstance(names, basestring):
             self.names = NumberDict()
             self.names[names] = 1
@@ -319,12 +321,12 @@ class PhysicalQuantity(object):
     applicable as well.
     """
 
-    global_precision = 8
+    global_precision = 2
 
     _number = re.compile(r'([+-]?[0-9]+(?:\.[0-9]*)?(?:[eE][+-]?[0-9]+)?)'
         r'(?:\s+\+\/-\s+([+-]?[0-9]+(?:\.[0-9]*)?(?:[eE][+-]?[0-9]+)?))?')
 
-    def __init__(self, value, unit=None, stdev=None):
+    def __init__(self, value, unit=None,  **kwargs):
         """There are two constructor calling patterns:
 
         1. PhysicalQuantity(value, unit), where value is any number and unit is
@@ -334,8 +336,15 @@ class PhysicalQuantity(object):
            that contains both the value and the unit, i.e. '1.5 m/s'. This form
            is provided for more convenient interactive use.
         """
+        for key, val in kwargs.iteritems():
+            if key is 'islog':
+                islog = val    # convert to log at initialization
+            if key is 'stddev':
+                self.stddev = val
+        
         if unit is not None:
-            self.value = valuetype(value, stdev)
+            self.value = value
+#            self.value = valuetype(value, stdev)        
             self.unit = _findUnit(unit)
         else:
             s = value.strip()
@@ -345,16 +354,32 @@ class PhysicalQuantity(object):
             self.value = valuetype(match.group(1), match.group(2))
             self.unit = _findUnit(s[match.end(0):])
 
+    def __getattr__(self,attr):
+        try:
+            attrunit = _unit_table[attr]
+        except:
+            return            
+        if self.unit.prefixed == True:
+            base = self.unit.comment
+        else:
+            base = self.unit.name
+        if isPhysicalUnit(attrunit):
+            if attrunit.prefixed == True:
+                a = attrunit.comment
+            else:
+                a = attrunit.name
+            if a == base:
+               return self.to(attrunit.name)
+            base = self.base
+            if a == base.unit.name:
+                return self.to(attrunit.name)
+        
+
     def __str__(self):
         prec = self.global_precision
         unit = self.unit.name.replace('**', '^')
-        if isinstance(self.value, uncertain):
-            stdev = self.value.std_dev
-            if stdev:
-                return '%.*f +/- %.*f %s' % (prec, self.value.nominal_value,
-                                             prec, stdev, unit)
-            return '%.*f %s' % (prec, self.value.nominal_value, unit)
-        return '%.*f %s' % (prec, self.value, unit)
+        #return '%.*f %s' % (prec, self.value, unit)
+        return '%f %s' % ( self.value, unit)        
 
     def __float__(self):
         if isinstance(self.value, uncertain):
@@ -592,7 +617,7 @@ for unit in _base_units:
     _unit_table[unit[0]] = unit[1]
 
 
-def _addUnit(name, unit, comment=''):
+def _addUnit(name, unit, comment='',prefixed=False):
     if name in _unit_table:
         raise KeyError('Unit ' + name + ' already defined')
     if isinstance(unit, str):
@@ -603,6 +628,8 @@ def _addUnit(name, unit, comment=''):
             except:
                 pass
     unit.set_name(name)
+    unit.comment = comment
+    unit.prefixed = prefixed
     _unit_table[name] = unit
 
 
@@ -610,7 +637,7 @@ def _addPrefixed(unit):
     _prefixed_names = []
     for prefix in _prefixes:
         name = prefix[0] + unit
-        _addUnit(name, prefix[1]*_unit_table[unit])
+        _addUnit(name, prefix[1]*_unit_table[unit],prefixed=True,comment=unit)
         _prefixed_names.append(name)
 
 _unit_table['kg'] = PhysicalUnit('kg',   1., [0, 1, 0, 0, 0, 0, 0, 0, 0])
@@ -622,7 +649,7 @@ _addUnit('W', 'J/s', 'Watt')
 _addUnit('C', 's*A', 'Coulomb')
 _addUnit('V', 'W/A', 'Volt')
 _addUnit('F', 'C/V', 'Farad')
-_addUnit('ohm', 'V/A', 'Ohm')
+_addUnit('Ohm', 'V/A', 'Ohm')
 _addUnit('S', 'A/V', 'Siemens')
 _addUnit('Wb', 'V*s', 'Weber')
 _addUnit('T', 'Wb/m**2', 'Tesla')
@@ -651,6 +678,7 @@ _addUnit('deg', 'pi*rad/180', 'degrees')
 _addUnit('arcmin', 'pi*rad/180/60', 'minutes of arc')
 _addUnit('arcsec', 'pi*rad/180/3600', 'seconds of arc')
 _unit_table['cycles'] = 2*np.pi
+
 
 name = r'([_a-zA-Z]\w*)'
 number = r'(-?[\d0-9.eE-]+)'
@@ -730,7 +758,6 @@ def replace_inline(ml):
             return mo.group(1) + "*" + '(Quantity(\'1 ' + mo.group(3) + '\'))'
         except KeyError:
             return mo.group()
-
     return unit_match.sub(replace_unit, ml.group())
 
 
