@@ -358,7 +358,7 @@ class PhysicalQuantity(object):
         try:
             attrunit = _unit_table[attr]
         except:
-            return            
+            raise AttributeError
         if self.unit.prefixed == True:
             base = self.unit.comment
         else:
@@ -373,13 +373,13 @@ class PhysicalQuantity(object):
             base = self.base
             if a == base.unit.name:
                 return self.to(attrunit.name)
-        
+        raise AttributeError
 
     def __str__(self):
         prec = self.global_precision
         unit = self.unit.name.replace('**', '^')
-        #return '%.*f %s' % (prec, self.value, unit)
-        return '%f %s' % ( self.value, unit)        
+        return '%.*f %s' % (prec, self.value, unit)
+        #return '%f %s' % ( self.value, unit)        
 
     def __float__(self):
         if isinstance(self.value, uncertain):
