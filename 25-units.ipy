@@ -3,8 +3,8 @@
 try:
     Quantity
 except NameError:    
-    %load_ext physics_extension
-    %load_ext dB_extension
+    %load_ext physical-units
+    %load_ext dB-units
 
     
 class UnitError(ValueError):

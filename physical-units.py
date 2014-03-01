@@ -119,7 +119,7 @@ class PhysicalUnit(object):
     can be multiplied, divided, and raised to integer powers.
     """
 
-    def __init__(self, names, factor, powers, offset=0):
+    def __init__(self, names, factor, powers, offset=0,url='',comment=''):
         """
         @param names: a dictionary mapping each name component to its
                       associated integer power (e.g. C{{'m': 1, 's': -1}})
@@ -132,6 +132,9 @@ class PhysicalUnit(object):
         """
 
         self.prefixed = False
+        self.comment = comment
+        self.url = url        
+        self.baseunit = ''
         if isinstance(names, basestring):
             self.names = NumberDict()
             self.names[names] = 1
@@ -287,10 +290,9 @@ class PhysicalUnit(object):
 
 
 # Helper functions
-
 def _findUnit(unit):
     if isinstance(unit, basestring):
-        name = unit.strip().replace('^', '**').replace('µ', 'mu').replace('°', 'deg')
+        name = unit.strip().replace('^', '**').replace('µ', 'mu').replace('°', 'deg') #.replace('*', r' \cdot ').replace(' pi', r' \pi ')
         try:
             unit = eval(name, _unit_table)
         except NameError:
@@ -320,8 +322,6 @@ class PhysicalQuantity(object):
     first operand. A limited set of mathematical functions (from numpy) is
     applicable as well.
     """
-
-    global_precision = 2
 
     _number = re.compile(r'([+-]?[0-9]+(?:\.[0-9]*)?(?:[eE][+-]?[0-9]+)?)'
         r'(?:\s+\+\/-\s+([+-]?[0-9]+(?:\.[0-9]*)?(?:[eE][+-]?[0-9]+)?))?')
@@ -364,22 +364,24 @@ class PhysicalQuantity(object):
         else:
             base = self.unit.name
         if isPhysicalUnit(attrunit):
-            if attrunit.prefixed == True:
-                a = attrunit.comment
-            else:
-                a = attrunit.name
-            if a == base:
-               return self.to(attrunit.name)
-            base = self.base
-            if a == base.unit.name:
-                return self.to(attrunit.name)
+#        print attrunit, base
+#            if attrunit.prefixed == True:
+#                a = attrunit.baseunit.name
+#            else:
+#                a = attrunit.name
+#            if a == base:
+#               return self.to(attrunit.name)
+#            base = self.base
+#            if a == base.unit.name:
+            return self.to(attrunit.name)
         raise AttributeError
 
     def __str__(self):
-        prec = self.global_precision
         unit = self.unit.name.replace('**', '^')
-        return '%.*f %s' % (prec, self.value, unit)
-        #return '%f %s' % ( self.value, unit)        
+        return '%s %s' % ( self.value, unit)
+
+    def __complex__(self):
+        return self.base.value
 
     def __float__(self):
         if isinstance(self.value, uncertain):
@@ -395,17 +397,8 @@ class PhysicalQuantity(object):
         return self.__str__()
 
     def _repr_latex_(self):
-        prec = self.global_precision
-        unit = self.unit.name.replace('**', '^')
-        if isinstance(self.value, uncertain):
-            stdev = self.value.std_dev
-            if stdev:
-                s = r'%.*f $\pm$ %.*f $%s$' % (prec, self.value.nominal_value,
-                                             prec, stdev, unit)
-            else:
-                s = r'%.*f $%s$' % (prec, self.value.nominal_value, unit)
-        else:
-            s = r'%.*f $%s$' % (prec, self.value, unit)
+        unit = self.unit.name.replace('**', '^').replace('µ', 'mu').replace('°', 'deg').replace('*', r' \cdot ').replace(' pi', r' \pi ')        
+        s = r'%s $%s$' % (self.value, unit)
         return s
 
     @property
@@ -555,7 +548,7 @@ class PhysicalQuantity(object):
         new_value = self.value * self.unit.factor
         num = ''
         denom = ''
-        for i in xrange(9):
+        for i in xrange(len(_base_names)): 
             unit = _base_names[i]
             power = self.unit.powers[i]
             if power < 0:
@@ -601,15 +594,16 @@ class PhysicalQuantity(object):
 _base_names = ['m', 'kg', 's', 'A', 'K', 'mol', 'cd', 'rad', 'sr']
 
 _base_units = [
-    ('m',   PhysicalUnit('m',   1.,    [1, 0, 0, 0, 0, 0, 0, 0, 0])),
-    ('g',   PhysicalUnit('g',   0.001, [0, 1, 0, 0, 0, 0, 0, 0, 0])),
-    ('s',   PhysicalUnit('s',   1.,    [0, 0, 1, 0, 0, 0, 0, 0, 0])),
-    ('A',   PhysicalUnit('A',   1.,    [0, 0, 0, 1, 0, 0, 0, 0, 0])),
-    ('K',   PhysicalUnit('K',   1.,    [0, 0, 0, 0, 1, 0, 0, 0, 0])),
-    ('mol', PhysicalUnit('mol', 1.,    [0, 0, 0, 0, 0, 1, 0, 0, 0])),
-    ('cd',  PhysicalUnit('cd',  1.,    [0, 0, 0, 0, 0, 0, 1, 0, 0])),
-    ('rad', PhysicalUnit('rad', 1.,    [0, 0, 0, 0, 0, 0, 0, 1, 0])),
-    ('sr',  PhysicalUnit('sr',  1.,    [0, 0, 0, 0, 0, 0, 0, 0, 1])), ]
+    ('m',   PhysicalUnit('m',   1.,    [1, 0, 0, 0, 0, 0, 0, 0, 0],url='https://en.wikipedia.org/wiki/Metre', comment='Metre')),
+    ('g',   PhysicalUnit('g',   0.001, [0, 1, 0, 0, 0, 0, 0, 0, 0],url='https://en.wikipedia.org/wiki/Kilogram', comment='Kiloram')),
+    ('s',   PhysicalUnit('s',   1.,    [0, 0, 1, 0, 0, 0, 0, 0, 0],url='https://en.wikipedia.org/wiki/Second', comment='Second')),
+    ('A',   PhysicalUnit('A',   1.,    [0, 0, 0, 1, 0, 0, 0, 0, 0],url='https://en.wikipedia.org/wiki/Ampere', comment='Ampere')),
+    ('K',   PhysicalUnit('K',   1.,    [0, 0, 0, 0, 1, 0, 0, 0, 0],url='https://en.wikipedia.org/wiki/Kelvin', comment='Kelvin')),
+    ('mol', PhysicalUnit('mol', 1.,    [0, 0, 0, 0, 0, 1, 0, 0, 0],url='https://en.wikipedia.org/wiki/Mole_(unit)', comment='Mol')),
+    ('cd',  PhysicalUnit('cd',  1.,    [0, 0, 0, 0, 0, 0, 1, 0, 0],url='https://en.wikipedia.org/wiki/Candela', comment='Candela')),
+    ('rad', PhysicalUnit('rad', 1.,    [0, 0, 0, 0, 0, 0, 0, 1, 0],url='https://en.wikipedia.org/wiki/Radian', comment='Radian')),
+    ('sr',  PhysicalUnit('sr',  1.,    [0, 0, 0, 0, 0, 0, 0, 0, 1],url='https://en.wikipedia.org/wiki/Steradian', comment='Streradian')), ]
+
 
 _unit_table = {}
 
@@ -617,45 +611,50 @@ for unit in _base_units:
     _unit_table[unit[0]] = unit[1]
 
 
-def _addUnit(name, unit, comment='',prefixed=False):
+def _addUnit(name, unit, comment='',prefixed=False, prefixunit=None, url=''):
     if name in _unit_table:
         raise KeyError('Unit ' + name + ' already defined')
     if isinstance(unit, str):
-        unit = eval(unit, _unit_table)
+        newunit = eval(unit, _unit_table)
         for cruft in ['__builtins__', '__args__']:
             try:
                 del _unit_table[cruft]
             except:
                 pass
-    unit.set_name(name)
-    unit.comment = comment
-    unit.prefixed = prefixed
-    _unit_table[name] = unit
+    else:
+        newunit = unit
+    newunit.set_name(name)
+    newunit.comment = comment
+    newunit.prefixunit = unit
+    newunit.prefixed = prefixed
+    newunit.url = url
+    newunit.baseunit = unit
+    _unit_table[name] = newunit
 
 
 def _addPrefixed(unit):
     _prefixed_names = []
     for prefix in _prefixes:
         name = prefix[0] + unit
-        _addUnit(name, prefix[1]*_unit_table[unit],prefixed=True,comment=unit)
+        _addUnit(name, prefix[1]*_unit_table[unit],prefixed=True,prefixunit=unit)
         _prefixed_names.append(name)
 
 _unit_table['kg'] = PhysicalUnit('kg',   1., [0, 1, 0, 0, 0, 0, 0, 0, 0])
-_addUnit('Hz', '1/s', 'Hertz')
-_addUnit('N', 'm*kg/s**2', 'Newton')
-_addUnit('Pa', 'N/m**2', 'Pascal')
-_addUnit('J', 'N*m', 'Joule')
-_addUnit('W', 'J/s', 'Watt')
-_addUnit('C', 's*A', 'Coulomb')
-_addUnit('V', 'W/A', 'Volt')
-_addUnit('F', 'C/V', 'Farad')
-_addUnit('Ohm', 'V/A', 'Ohm')
-_addUnit('S', 'A/V', 'Siemens')
-_addUnit('Wb', 'V*s', 'Weber')
-_addUnit('T', 'Wb/m**2', 'Tesla')
-_addUnit('H', 'Wb/A', 'Henry')
-_addUnit('lm', 'cd*sr', 'Lumen')
-_addUnit('lx', 'lm/m**2', 'Lux')
+_addUnit('Hz', '1/s', 'Hertz', url='https://en.wikipedia.org/wiki/Hertz')
+_addUnit('N', 'm*kg/s**2', 'Newton', url='https://en.wikipedia.org/wiki/Newton_(unit)')
+_addUnit('Pa', 'N/m**2', 'Pascal', url='https://en.wikipedia.org/wiki/Pascal_(unit)')
+_addUnit('J', 'N*m', 'Joule', url='https://en.wikipedia.org/wiki/Joule')
+_addUnit('W', 'J/s', 'Watt', url='https://en.wikipedia.org/wiki/Watt')
+_addUnit('C', 's*A', 'Coulomb', url='https://en.wikipedia.org/wiki/Coulomb')
+_addUnit('V', 'W/A', 'Volt', url='https://en.wikipedia.org/wiki/Volt')
+_addUnit('F', 'C/V', 'Farad', url='https://en.wikipedia.org/wiki/Farad')
+_addUnit('Ohm', 'V/A', 'Ohm', url='https://en.wikipedia.org/wiki/Ohm_(unit)')
+_addUnit('S', 'A/V', 'Siemens', url='https://en.wikipedia.org/wiki/Siemens_(unit)')
+_addUnit('Wb', 'V*s', 'Weber', url='https://en.wikipedia.org/wiki/Weber_(unit)')
+_addUnit('T', 'Wb/m**2', 'Tesla', url='https://en.wikipedia.org/wiki/Tesla_(unit)')
+_addUnit('H', 'Wb/A', 'Henry', url='https://en.wikipedia.org/wiki/Henry_(unit)')
+_addUnit('lm', 'cd*sr', 'Lumen', url='https://en.wikipedia.org/wiki/Lumen_(unit)')
+_addUnit('lx', 'lm/m**2', 'Lux', url='https://en.wikipedia.org/wiki/Lux')
 del _unit_table['kg']
 
 # add scaling prefixes
@@ -671,7 +670,7 @@ for unit in _unit_table.keys():
     _addPrefixed(unit)
 
 _unit_table['pi'] = np.pi
-_unit_table['kg'] = PhysicalUnit('kg',   1., [0, 1, 0, 0, 0, 0, 0, 0, 0])
+_unit_table['kg'] = PhysicalUnit('kg',   1., [0, 1, 0, 0, 0, 0, 0, 0, 0],url='https://en.wikipedia.org/wiki/Kilogram')
 
 # Angle units
 _addUnit('deg', 'pi*rad/180', 'degrees')
@@ -679,6 +678,26 @@ _addUnit('arcmin', 'pi*rad/180/60', 'minutes of arc')
 _addUnit('arcsec', 'pi*rad/180/3600', 'seconds of arc')
 _unit_table['cycles'] = 2*np.pi
 
+_addUnit('min', '60*s', 'Minutes')
+_addUnit('h', '60*60*s', 'Hours')
+
+def list_units():
+    str = "<table>"
+    str += "<tr><th>Name</th><th>Base Unit</th><th>Quantity</th></tr>"
+    for name in _unit_table:
+        unit = _unit_table[name]
+        if isinstance(unit,PhysicalUnit):
+            if unit.prefixed == False:
+                baseunit = '$' + unit.name + '$'
+                if unit.baseunit != '':
+                    baseunit = '$' + unit.baseunit.replace('**', '^')
+                    baseunit = baseunit.replace('*', r' \cdot ')
+                    baseunit = baseunit.replace('pi', r' \pi ') + '$'
+                str+= "<tr><td>" + unit.name + '</td><td>' + baseunit +\
+                      '</td><td><a href="' + unit.url+'" target="_blank">'+ unit.comment +\
+                      "</a></td></tr>"
+    str += "</table>"
+    return str
 
 name = r'([_a-zA-Z]\w*)'
 number = r'(-?[\d0-9.eE-]+)'
@@ -686,8 +705,6 @@ unit = r'([a-zA-Z1°µ][a-zA-Z0-9°µ/*^-]*)'
 quantity = number + r'(?:\s+\+\/-\s+' + number + ')?' + r'\s+' + unit
 
 inline_unit_re = re.compile(r'\((%s)\)' % quantity)
-slash_conv_re = re.compile(r'^(.*?)//\s*%s$' % unit)
-slash_last_re = re.compile(r'^()\(/, %s\)$' % unit)
 
 nice_assign_re = re.compile(r'^%s\s*=\s*(%s)$' % (name, quantity))
 quantity_re = re.compile(quantity)
@@ -702,13 +719,16 @@ for unit in _li[::-1]:
 _unit_list = _unit_list[0:-1] + ')'
 
 # regex for finding units and quoted strings
-number = r'-?[\d0-9.]+'
+#number = r'-?[\d0-9.]+'
+number = r'(-?[\d0-9-]+' +r'-?[\d0-9.eE-]*)'
 stringmatch = r'(["\'])(?:(?=(\\?))\2.)*?\1'
 match = stringmatch + '|' + number + r'(\s*)' + _unit_list + r'(?:\W+|$)'
 line_match = re.compile(match)
 
 # regex to match unit after it has been found using line_match
-number = r'(-?[\d0-9-]+)'
+#number = r'(-?[\d0-9-]+)'
+number = r'(-?[\d0-9-]+' +r'-?[\d0-9.eE-]*)'
+
 match = number + r'(.\s|\s*)' + _unit_list
 unit_match = re.compile(match)
 
@@ -718,26 +738,6 @@ def replace_inline(match):
     using a Quantity call.
     """
     return '(Quantity(\'' + match.group(1) + '\'))'
-
-
-def replace_slash(match):
-    """Replace a double-slash unit conversion, e.g. ``c // km/s``, by valid
-    Python code using a Quantity call.
-    """
-    expr = match.group(1)
-    unit = str(match.group(2))  # PhysicalQuantity doesn't like Unicode strings
-    if quantity_re.match(expr):
-        expr = 'Quantity(\'' + expr + '\')'
-    elif not expr:
-        expr = '_'
-    else:
-        expr = '(' + expr + ')'
-    if unit == 'base':
-        return '(' + expr + ').base'
-    if unit == 'cgs':
-        return '(' + expr + ').cgs'
-    else:
-        return 'Quantity.any_to(%s, %r)' % (expr, unit)
 
 
 def replace_assign(match):
@@ -755,7 +755,7 @@ def replace_inline(ml):
 
     def replace_unit(mo):
         try:
-            return mo.group(1) + "*" + '(Quantity(\'1 ' + mo.group(3) + '\'))'
+            return '(' + mo.group(1) + '*' + 'Quantity(\'1 ' + mo.group(3) + '\'))'
         except KeyError:
             return mo.group()
     return unit_match.sub(replace_unit, ml.group())
@@ -775,10 +775,9 @@ def load_ipython_extension(ip):
 
     # set up simplified quantity input
     ip.user_ns['Quantity'] = PhysicalQuantity
-    # setter for custom precision
-    ip.user_ns['setprec'] = \
-        lambda p: setattr(PhysicalQuantity, 'global_precision', p)
 
+    ip.user_ns['Units_List'] = list_units
+       
     # active true float division
     exec ip.compile('from __future__ import division', '<input>', 'single') \
         in ip.user_ns
