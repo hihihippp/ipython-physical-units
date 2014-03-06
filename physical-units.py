@@ -17,29 +17,7 @@ import numpy as np
 
 from IPython.core.inputtransformer import StatelessInputTransformer
 from IPython.core.inputtransformer import CoroutineInputTransformer
-from IPython.display import display, Math, Latex
-
-# allow uncertain values if the "uncertainties" package is available
-try:
-    from uncertainties import ufloat, Variable, AffineScalarFunc
-    import uncertainties.umath as unp
-    uncertain = (Variable, AffineScalarFunc)
-
-    def valuetype(v, u):
-        if isinstance(v, uncertain):
-            return v
-        elif u is None:
-            return float(v)
-        return ufloat(float(v), float(u))
-except ImportError:
-    uncertain = ()
-
-    def valuetype(v, u):
-        if u is None:
-            return float(v)
-        return v
-    unp = np
-
+from IPython.display import display, Math, Latex, HTML
 
 class UnitError(ValueError):
     pass
@@ -109,7 +87,7 @@ def isPhysicalUnit(x):
 
 def isPhysicalQuantity(x):
     return hasattr(x, 'value') and hasattr(x, 'unit')
-
+   
 
 class PhysicalUnit(object):
     """Physical unit.
@@ -132,9 +110,10 @@ class PhysicalUnit(object):
         """
 
         self.prefixed = False
+        self.prefixunit = self
+        self.baseunit = self
         self.comment = comment
         self.url = url        
-        self.baseunit = ''
         if isinstance(names, basestring):
             self.names = NumberDict()
             self.names[names] = 1
@@ -181,7 +160,24 @@ class PhysicalUnit(object):
         return self.name
 
     def __repr__(self):
+        unit = self.name.replace('**', '^').replace('µ', 'mu').replace('°', 'deg')
         return '<PhysicalUnit ' + self.name + '>'
+
+    def _repr_latex_(self):   
+        unit = self.name.replace('**', '^').replace('µ', 'mu').replace('°', 'deg').replace('*', r' \cdot ').replace(' pi', r' \pi ')
+        if self.prefixed == False:
+            info = '(<a href="' + self.url + '" target="_blank">'+ self.comment + '</a>)'
+        else:
+            baseunit = _unit_table[self.prefixunit]
+#            print  baseunit.comment, baseunit.url
+            info = r'$ = %s \cdot %s$ (' % (self.factor, self.prefixunit) +\
+                    '<a href="' + baseunit.url + '" target="_blank">'+ baseunit.comment + '</a>)'            
+        s = r'$%s$ %s' % (unit, info)
+        return s
+
+    @property
+    def latex(self):
+        return Latex(self._repr_latex_())
 
     def __cmp__(self, other):
         if self.powers != other.powers:
@@ -288,6 +284,22 @@ class PhysicalUnit(object):
         offset = self.offset - (other.offset * other.factor / self.factor)
         return (factor, offset)
 
+    def list(self):
+        """ List all defined units """
+        str = "<table>"
+        str += "<tr><th>Name</th><th>Base Unit</th><th>Quantity</th></tr>"
+        for name in _unit_table:
+            unit = _unit_table[name]
+            if isinstance(unit,PhysicalUnit):
+                if unit.prefixed == False:
+                    baseunit = '$ %s $' % unit.baseunit 
+                    baseunit = baseunit.strip().replace('^', '**').replace('µ', 'mu').replace('°', 'deg').replace('*', r' \cdot ').replace(' pi', r' \pi ')
+                    str+= "<tr><td>" + unit.name + '</td><td>' + baseunit +\
+                          '</td><td><a href="' + unit.url+'" target="_blank">'+ unit.comment +\
+                          "</a></td></tr>"
+        str += "</table>"
+        return HTML(str)
+
 
 # Helper functions
 def _findUnit(unit):
@@ -323,9 +335,8 @@ class PhysicalQuantity(object):
     applicable as well.
     """
 
-    _number = re.compile(r'([+-]?[0-9]+(?:\.[0-9]*)?(?:[eE][+-]?[0-9]+)?)'
-        r'(?:\s+\+\/-\s+([+-]?[0-9]+(?:\.[0-9]*)?(?:[eE][+-]?[0-9]+)?))?')
-
+    __array_priority__ = 1000 # make sure numpy arrays do not get iterated
+    
     def __init__(self, value, unit=None,  **kwargs):
         """There are two constructor calling patterns:
 
@@ -337,22 +348,15 @@ class PhysicalQuantity(object):
            is provided for more convenient interactive use.
         """
         for key, val in kwargs.iteritems():
-            if key is 'islog':
-                islog = val    # convert to log at initialization
-            if key is 'stddev':
-                self.stddev = val
+            pass
+#            if key is 'islog':
+#                islog = val    # convert to log at initialization
         
         if unit is not None:
             self.value = value
-#            self.value = valuetype(value, stdev)        
             self.unit = _findUnit(unit)
         else:
-            s = value.strip()
-            match = self._number.match(s)
-            if match is None:
-                raise UnitError('No number found in %r' % value)
-            self.value = valuetype(match.group(1), match.group(2))
-            self.unit = _findUnit(s[match.end(0):])
+            raise UnitError('No number found in %r' % value)
 
     def __getattr__(self,attr):
         try:
@@ -364,15 +368,6 @@ class PhysicalQuantity(object):
         else:
             base = self.unit.name
         if isPhysicalUnit(attrunit):
-#        print attrunit, base
-#            if attrunit.prefixed == True:
-#                a = attrunit.baseunit.name
-#            else:
-#                a = attrunit.name
-#            if a == base:
-#               return self.to(attrunit.name)
-#            base = self.base
-#            if a == base.unit.name:
             return self.to(attrunit.name)
         raise AttributeError
 
@@ -384,9 +379,6 @@ class PhysicalQuantity(object):
         return self.base.value
 
     def __float__(self):
-        if isinstance(self.value, uncertain):
-            return self.base.value.nominal_value
-        else:
             return self.base.value
 
     @property
@@ -428,8 +420,6 @@ class PhysicalQuantity(object):
         return cmp(diff.value, 0)
 
     def __mul__(self, other):
-        if isinstance(other, np.ndarray):
-            return other * self.__class__(self.value, self.unit)
         if not isPhysicalQuantity(other):
             return self.__class__(self.value * other, self.unit)
         value = self.value * other.value
@@ -442,10 +432,6 @@ class PhysicalQuantity(object):
     __rmul__ = __mul__
 
     def __div__(self, other):
-        if isinstance(other, np.ndarray):
-            return 1./other * self.__class__(self.value, self.unit) 
-        if isinstance(other, np.ndarray):
-            return other / self.__class__(self.value, self.unit)
         if not isPhysicalQuantity(other):
             return self.__class__(self.value / other, self.unit)
         value = self.value / other.value
@@ -595,7 +581,7 @@ _base_names = ['m', 'kg', 's', 'A', 'K', 'mol', 'cd', 'rad', 'sr']
 
 _base_units = [
     ('m',   PhysicalUnit('m',   1.,    [1, 0, 0, 0, 0, 0, 0, 0, 0],url='https://en.wikipedia.org/wiki/Metre', comment='Metre')),
-    ('g',   PhysicalUnit('g',   0.001, [0, 1, 0, 0, 0, 0, 0, 0, 0],url='https://en.wikipedia.org/wiki/Kilogram', comment='Kiloram')),
+    ('g',   PhysicalUnit('g',   0.001, [0, 1, 0, 0, 0, 0, 0, 0, 0],url='https://en.wikipedia.org/wiki/Kilogram', comment='Kilogram')),
     ('s',   PhysicalUnit('s',   1.,    [0, 0, 1, 0, 0, 0, 0, 0, 0],url='https://en.wikipedia.org/wiki/Second', comment='Second')),
     ('A',   PhysicalUnit('A',   1.,    [0, 0, 0, 1, 0, 0, 0, 0, 0],url='https://en.wikipedia.org/wiki/Ampere', comment='Ampere')),
     ('K',   PhysicalUnit('K',   1.,    [0, 0, 0, 0, 1, 0, 0, 0, 0],url='https://en.wikipedia.org/wiki/Kelvin', comment='Kelvin')),
@@ -625,10 +611,10 @@ def _addUnit(name, unit, comment='',prefixed=False, prefixunit=None, url=''):
         newunit = unit
     newunit.set_name(name)
     newunit.comment = comment
-    newunit.prefixunit = unit
+    newunit.prefixunit = prefixunit
+    newunit.baseunit = unit
     newunit.prefixed = prefixed
     newunit.url = url
-    newunit.baseunit = unit
     _unit_table[name] = newunit
 
 
@@ -678,26 +664,8 @@ _addUnit('arcmin', 'pi*rad/180/60', 'minutes of arc')
 _addUnit('arcsec', 'pi*rad/180/3600', 'seconds of arc')
 _unit_table['cycles'] = 2*np.pi
 
-_addUnit('min', '60*s', 'Minutes')
-_addUnit('h', '60*60*s', 'Hours')
-
-def list_units():
-    str = "<table>"
-    str += "<tr><th>Name</th><th>Base Unit</th><th>Quantity</th></tr>"
-    for name in _unit_table:
-        unit = _unit_table[name]
-        if isinstance(unit,PhysicalUnit):
-            if unit.prefixed == False:
-                baseunit = '$' + unit.name + '$'
-                if unit.baseunit != '':
-                    baseunit = '$' + unit.baseunit.replace('**', '^')
-                    baseunit = baseunit.replace('*', r' \cdot ')
-                    baseunit = baseunit.replace('pi', r' \pi ') + '$'
-                str+= "<tr><td>" + unit.name + '</td><td>' + baseunit +\
-                      '</td><td><a href="' + unit.url+'" target="_blank">'+ unit.comment +\
-                      "</a></td></tr>"
-    str += "</table>"
-    return str
+_addUnit('min', '60*s', 'Minute', url='https://en.wikipedia.org/wiki/Hour')
+_addUnit('h', '60*60*s', 'Hour', url='https://en.wikipedia.org/wiki/Hour')
 
 name = r'([_a-zA-Z]\w*)'
 number = r'(-?[\d0-9.eE-]+)'
@@ -719,14 +687,12 @@ for unit in _li[::-1]:
 _unit_list = _unit_list[0:-1] + ')'
 
 # regex for finding units and quoted strings
-#number = r'-?[\d0-9.]+'
 number = r'(-?[\d0-9-]+' +r'-?[\d0-9.eE-]*)'
 stringmatch = r'(["\'])(?:(?=(\\?))\2.)*?\1'
 match = stringmatch + '|' + number + r'(\s*)' + _unit_list + r'(?:\W+|$)'
 line_match = re.compile(match)
 
 # regex to match unit after it has been found using line_match
-#number = r'(-?[\d0-9-]+)'
 number = r'(-?[\d0-9-]+' +r'-?[\d0-9.eE-]*)'
 
 match = number + r'(.\s|\s*)' + _unit_list
@@ -755,7 +721,7 @@ def replace_inline(ml):
 
     def replace_unit(mo):
         try:
-            return '(' + mo.group(1) + '*' + 'Quantity(\'1 ' + mo.group(3) + '\'))'
+            return '(' + mo.group(1) + '*' + 'Quantity( 1,\'' + mo.group(3) + '\'))'
         except KeyError:
             return mo.group()
     return unit_match.sub(replace_unit, ml.group())
@@ -775,8 +741,6 @@ def load_ipython_extension(ip):
 
     # set up simplified quantity input
     ip.user_ns['Quantity'] = PhysicalQuantity
-
-    ip.user_ns['Units_List'] = list_units
        
     # active true float division
     exec ip.compile('from __future__ import division', '<input>', 'single') \
