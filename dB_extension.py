@@ -55,6 +55,15 @@ class dBUnit(object):
         else:
             raise UnitError('Unknown unit %s' % unit)
 
+        for key, val in kwargs.iteritems():
+            # add attributes, e.g. varname.dBm
+            if key is 'attr':
+                base = _dB_units[self.unit][0]
+                for attr in _dB_units.keys():
+                    if _dB_units[attr][0] == base:
+                        setattr(self,attr, self.to(attr))
+                    print base,attr
+
     @property
     def dB(self):
         # return dB value without unit
@@ -105,9 +114,9 @@ class dBUnit(object):
     @property
     def lin(self):
         # return linear value with units
-        Q = ip.user_ns['Q']
+        Q = ip.user_ns['Quantity']
         val = self.__float__()
-        return Q(str(val) + ' ' + _dB_units[self.unit][0])
+        return Q(val, _dB_units[self.unit][0])
 
     def __float__(self):
         # return linear value in base unit
