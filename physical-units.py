@@ -687,7 +687,7 @@ for unit in _li[::-1]:
 _unit_list = _unit_list[0:-1] + ')'
 
 # regex for finding units and quoted strings
-number = r'(-?[\d0-9-]+' +r'-?[\d0-9.eE-]*)'
+number = r'(\s+|=|^)(-?[\d0-9-]+' +r'-?[\d0-9.eE-]*)'
 stringmatch = r'(["\'])(?:(?=(\\?))\2.)*?\1'
 match = stringmatch + '|' + number + r'(\s*)' + _unit_list + r'(?:\W+|$)'
 line_match = re.compile(match)
