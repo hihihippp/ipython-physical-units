@@ -1,7 +1,7 @@
-ipython-physical-units
-----------------------
+physical-units
+--------------
 
-IPython notebook extension to add physical units to IPython and the IPython notebook.
+Python module and IPython notebook extension to add physical units to Python, IPython and the IPython notebook.
 
 For an example notebook see here:
 http://nbviewer.ipython.org/github/juhasch/ipython-physical-units/blob/master/notebooks/units-example.ipynb
@@ -21,7 +21,5 @@ Features
 TODO
 ----
 
-- I removed some of the units included in the original implementation, add them back.
+- Cleanup
 - Provide a more exhaustive list of physical constants
-- Improve interaction with the uncertainties module 
-- Improve numpy handling. Automatically convert back to built-in type if units cancel out
